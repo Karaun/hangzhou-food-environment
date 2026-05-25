@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>城市食物环境可视化平台</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar">
+      <div class="brand compact-brand">
+        <div class="brand-copy">
+          <h1>城市食物环境可视化平台</h1>
+          <p>杭州市主城区城市食物环境可视化展示，包含社区食物环境统计展示、热力展示、三期数据统计等。</p>
+        </div>
+        <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="折叠侧边栏" title="折叠/展开侧边栏">☰</button>
+        <div class="brand-tags">
+          <span class="brand-tag">WGS84</span>
+          <span class="brand-tag">食物环境</span>
+          <span class="brand-tag">热力统计</span>
+        </div>
+      </div>
+
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab" data-side-tab="import" data-short="导">导入与图层</button>
+        <button class="sidebar-tab" data-side-tab="vector" data-short="矢">矢量分析</button>
+        <button class="sidebar-tab active" data-side-tab="food" data-short="食">食物环境</button>
+        <button class="sidebar-tab" data-side-tab="raster" data-short="栅">栅格分析</button>
+        <button class="sidebar-tab" data-side-tab="compare" data-short="比">栅格对比</button>
+      </div>
+
+      <div class="sidebar-pane" id="side-import">
+        <section class="panel panel-tight">
+          <h2>数据导入</h2>
+          <div class="upload-grid">
+            <label class="upload-box">
+              <span>GeoJSON / ArcGIS JSON</span>
+              <input id="geojsonFile" type="file" accept=".geojson,.json" />
+            </label>
+            <label class="upload-box">
+              <span>SHP（建议 zip）</span>
+              <input id="shpFile" type="file" accept=".zip,.shp" />
+            </label>
+            <label class="upload-box">
+              <span>CSV（经纬度转点）</span>
+              <input id="csvFile" type="file" accept=".csv" />
+            </label>
+            <label class="upload-box raster-box">
+              <span>GeoTIFF / TIF</span>
+              <input id="tiffFile" type="file" accept=".tif,.tiff,.geotiff" multiple />
+            </label>
+          </div>
+          <div class="tips compact-tips">
+            <div>矢量支持 GeoJSON、ArcGIS / Esri JSON、Shapefile。</div>
+            <div>SHP 推荐上传包含 <code>.shp + .dbf + .prj</code> 的 <code>.zip</code> 包。</div>
+            <div>小区点位经纬度采用 <code>WGS84 / EPSG:4326</code> 坐标系；栅格或外部矢量数据请保持经纬度坐标。</div>
+          </div>
+        </section>
+
+        <section class="panel panel-tight">
+          <div class="panel-head">
+            <h2>图层列表</h2>
+            <div class="panel-mini-actions">
+              <button id="clearVectorBtn" class="mini-action">清空矢量</button>
+              <button id="clearRasterBtn" class="mini-action">清空栅格</button>
+              <button id="clearAllBtn" class="mini-action danger">清空全部</button>
+            </div>
+          </div>
+          <div id="layerList" class="layer-list-panel empty-state">还没有导入图层。</div>
+        </section>
+
+        <section class="panel panel-tight">
+          <h2>显示控制</h2>
+          <div class="control-grid two-col">
+            <label class="toggle-card">
+              <span>显示矢量弹窗</span>
+              <input id="showPopup" type="checkbox" checked />
+            </label>
+            <label class="toggle-card">
+              <span>高亮选中矢量</span>
+              <input id="showHighlight" type="checkbox" checked />
+            </label>
+          </div>
+        </section>
+      </div>
+
+
+      <div class="sidebar-pane active" id="side-food">
+        <section class="panel panel-tight">
+          <h2>可视化内容选择</h2>
+          <div class="sub-title">选择时间、服务方式、餐饮类型和评价指标，地图自动切换社区点位分级与热力图。</div>
+          <div class="field-grid food-control-grid">
+            <div>
+              <label>时间截面</label>
+              <select id="foodYearSelect" class="input">
+                <option value="2019">2019 年</option>
+                <option value="2023">2023 年</option>
+                <option value="2025" selected>2025 年</option>
+              </select>
+            </div>
+            <div>
+              <label>服务方式</label>
+              <select id="foodModeSelect" class="input">
+                <option value="线上送餐">线上送餐食物环境</option>
+                <option value="线下步行">线下步行食物环境</option>
+              </select>
+            </div>
+            <div>
+              <label>餐饮类型</label>
+              <select id="foodMealSelect" class="input">
+                <option value="快餐">快餐</option>
+                <option value="正餐">正餐</option>
+              </select>
+            </div>
+            <div>
+              <label>评价指标</label>
+              <select id="foodMetricSelect" class="input">
+                <option value="可达性">可达性</option>
+                <option value="可得性">可得性</option>
+                <option value="平均价格">平均价格</option>
+                <option value="可选择性">可选择性</option>
+              </select>
+            </div>
+          </div>
+          <div class="control-grid two-col food-toggle-grid">
+            <label class="toggle-card">
+              <span>显示热力图</span>
+              <input id="foodHeatToggle" type="checkbox" checked />
+            </label>
+            <label class="toggle-card">
+              <span>显示小区点位</span>
+              <input id="foodVectorSync" type="checkbox" />
+            </label>
+          </div>
+          <div class="action-row wrap compact-action-row">
+            <button id="loadFoodDemoBtn" class="btn btn-primary">重新加载演示数据</button>
+            <button id="fitFoodBtn" class="btn btn-light">缩放到小区点位</button>
+          </div>
+          <div id="foodMetricSummary" class="food-mini-summary empty-state">正在准备食物环境演示数据。</div>
+        </section>
+
+        <section class="panel panel-tight">
+          <h2>演示内容</h2>
+          <div class="food-matrix-help">
+            <div><strong>时间：</strong>2019、2023、2025</div>
+            <div><strong>方式：</strong>线上、线下</div>
+            <div><strong>类型：</strong>正餐、快餐</div>
+            <div><strong>指标：</strong>可达性、可得性、平均价格、可选择性</div>
+          </div>
+        </section>
+      </div>
+
+      <div class="sidebar-pane" id="side-vector">
+        <section class="panel panel-tight">
+          <h2>当前矢量图层</h2>
+          <div id="activeVectorHint" class="sub-title">当前未选择矢量分析图层</div>
+          <div class="field-grid">
+            <div>
+              <label>关键字搜索</label>
+              <input id="keywordInput" class="input" type="text" placeholder="搜索任意属性值" />
+            </div>
+            <div>
+              <label>分类字段</label>
+              <select id="categoryField" class="input">
+                <option value="">请选择字段</option>
+              </select>
+            </div>
+            <div>
+              <label>分类值筛选</label>
+              <input id="categoryValue" class="input" type="text" placeholder="例如：北京 / A类 / 2025" />
+            </div>
+            <div>
+              <label>专题渲染数值字段</label>
+              <select id="renderField" class="input">
+                <option value="">请选择数值字段</option>
+              </select>
+            </div>
+          </div>
+          <div class="action-row wrap compact-action-row">
+            <button id="applyFilterBtn" class="btn btn-primary">应用筛选</button>
+            <button id="resetFilterBtn" class="btn btn-light">重置</button>
+          </div>
+        </section>
+
+        <section class="panel panel-tight">
+          <h2>矢量统计概览</h2>
+          <div class="stats-grid compact-stats-grid">
+            <div class="stat-card"><span>要素数量</span><strong id="statCount">0</strong></div>
+            <div class="stat-card"><span>总面积(km²)</span><strong id="statArea">0.00</strong></div>
+            <div class="stat-card"><span>总长度(km)</span><strong id="statLength">0.00</strong></div>
+            <div class="stat-card hidden-stat"><span>数值合计</span><strong id="statSum">0.00</strong></div>
+            <div class="stat-card"><span>均值</span><strong id="statAvg">0.00</strong></div>
+            <div class="stat-card"><span>最大值</span><strong id="statMax">0.00</strong></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="sidebar-pane" id="side-raster">
+        <section class="panel panel-tight">
+          <h2>当前栅格图层</h2>
+          <div id="activeRasterHint" class="sub-title">当前未选择栅格分析图层</div>
+          <div class="field-grid raster-grid">
+            <div>
+              <label>显示波段</label>
+              <select id="bandSelect" class="input" disabled>
+                <option value="0">波段 1</option>
+              </select>
+            </div>
+            <div>
+              <label>重采样</label>
+              <select id="resampleMethod" class="input">
+                <option value="nearest">nearest（分类数据推荐）</option>
+                <option value="bilinear">bilinear（连续数据推荐）</option>
+              </select>
+            </div>
+            <div>
+              <div class="row between small-gap"><label for="rasterOpacity">透明度</label><strong id="rasterOpacityLabel">0.75</strong></div>
+              <input id="rasterOpacity" type="range" min="0" max="1" step="0.05" value="0.75" />
+            </div>
+            <div>
+              <div class="row between small-gap"><label for="classCount">分类数</label><strong id="classCountLabel">5</strong></div>
+              <input id="classCount" type="range" min="3" max="9" step="1" value="5" />
+            </div>
+          </div>
+          <div class="action-row wrap compact-action-row">
+            <button id="refreshRasterBtn" class="btn btn-primary">刷新渲染</button>
+            <button id="fitRasterBtn" class="btn btn-light">缩放到栅格</button>
+          </div>
+        </section>
+
+        <section class="panel panel-tight">
+          <h2>栅格统计概览</h2>
+          <div class="stats-grid compact-stats-grid">
+            <div class="stat-card"><span>有效像元</span><strong id="rasterPixelCount">0</strong></div>
+            <div class="stat-card"><span>最小值</span><strong id="rasterMin">-</strong></div>
+            <div class="stat-card"><span>最大值</span><strong id="rasterMax">-</strong></div>
+            <div class="stat-card"><span>均值</span><strong id="rasterMean">-</strong></div>
+            <div class="stat-card"><span>像元面积(km²)</span><strong id="rasterCellArea">-</strong></div>
+            <div class="stat-card"><span>分类总面积(km²)</span><strong id="rasterClassAreaTotal">-</strong></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="sidebar-pane" id="side-compare">
+        <section class="panel panel-tight">
+          <h2>多栅格对比</h2>
+          <div class="sub-title">支持对比两个 GeoTIFF 的重叠区域统计结果，可比较均值、最小值、最大值等指标。</div>
+          <div class="field-grid raster-grid">
+            <div>
+              <label>基准栅格</label>
+              <select id="compareBaseSelect" class="input">
+                <option value="">请选择基准栅格</option>
+              </select>
+            </div>
+            <div>
+              <label>对比栅格</label>
+              <select id="compareTargetSelect" class="input">
+                <option value="">请选择对比栅格</option>
+              </select>
+            </div>
+            <div>
+              <label>基准波段</label>
+              <select id="compareBaseBand" class="input">
+                <option value="0">波段 1</option>
+              </select>
+            </div>
+            <div>
+              <label>对比波段</label>
+              <select id="compareTargetBand" class="input">
+                <option value="0">波段 1</option>
+              </select>
+            </div>
+          </div>
+          <div class="action-row wrap compact-action-row">
+            <button id="runCompareBtn" class="btn btn-primary">开始对比</button>
+            <button id="swapCompareBtn" class="btn btn-light">交换顺序</button>
+          </div>
+          <div class="tips compact-tips">
+            <div>自动按重叠范围比较，允许两个栅格分辨率不同。</div>
+            <div>当前版本默认按最近邻采样对比，适合城市规划分级结果。</div>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar compact-topbar">
+        <div class="meta-block">
+          <h2>杭州市主城区城市食物环境可视化平台</h2>
+          <p class="platform-subtitle">杭州市主城区城市食物环境可视化展示，包含：社区食物环境统计展示、热力展示、三期数据统计等。</p>
+          <p id="datasetMeta">正在加载小区食物环境演示数据</p>
+          <p id="rasterMeta" class="secondary-meta">当前未加载栅格</p>
+          <p id="compareMeta" class="secondary-meta">当前未执行栅格对比</p>
+        </div>
+      </header>
+
+      <div class="workspace workspace-wide">
+        <div class="map-card">
+          <div class="map-toolbar">
+            <span class="map-chip">Leaflet 地图</span>
+            <span id="mapVectorHint" class="map-chip">矢量 0</span>
+            <span id="mapRasterHint" class="map-chip">栅格 0</span>
+          </div>
+          <div class="legend-stack compact-legend-stack map-legend-overlay">
+            <div class="legend-box">
+              <div class="legend-title">矢量专题图例</div>
+              <div id="legendContent" class="legend-content">未选择专题字段</div>
+            </div>
+            <div class="legend-box">
+              <div class="legend-title">食物环境热力图例</div>
+              <div id="foodHeatLegend" class="legend-content">默认加载后显示热力分级</div>
+            </div>
+            <div class="legend-box raster-legend-box">
+              <div class="legend-title">栅格分级图例</div>
+              <div id="rasterLegend" class="legend-content">未加载栅格</div>
+            </div>
+          </div>
+          <div id="map"></div>
+        </div>
+
+        <section class="info-panel compact-info-panel">
+          <div class="tabs multi-tabs">
+            <button class="tab-btn active" data-tab="selected">选中矢量</button>
+            <button class="tab-btn" data-tab="fields">字段信息</button>
+            <button class="tab-btn" data-tab="category">分类统计</button>
+            <button class="tab-btn" data-tab="food">食物环境</button>
+            <button class="tab-btn" data-tab="raster">栅格分析</button>
+            <button class="tab-btn" data-tab="compare">对比结果</button>
+          </div>
+
+          <div class="tab-content active" id="tab-selected">
+            <div id="selectedFeature" class="empty-state">点击矢量要素后，这里会显示详细属性。</div>
+          </div>
+
+          <div class="tab-content" id="tab-fields">
+            <div id="fieldList" class="empty-state">导入矢量数据后显示字段列表。</div>
+          </div>
+
+          <div class="tab-content" id="tab-category">
+            <div class="chart-switcher" data-chart-group="vector">
+              <button class="chart-switch active" data-chart-panel="chart-vector-category">分类柱状图</button>
+              <button class="chart-switch" data-chart-panel="chart-vector-trend">数值趋势折线图</button>
+            </div>
+            <div class="chart-stack chart-stack-sm">
+              <div class="chart-panel active" id="chart-vector-category">
+                <div class="chart-card compact-chart-card">
+                  <div class="chart-head"><h3>分类柱状图</h3><span>按当前分类字段统计</span></div>
+                  <div class="chart-canvas-wrap compact-chart-wrap"><canvas id="vectorCategoryChart"></canvas></div>
+                </div>
+              </div>
+              <div class="chart-panel" id="chart-vector-trend">
+                <div class="chart-card compact-chart-card">
+                  <div class="chart-head"><h3>数值趋势折线图</h3><span>按当前专题字段排序展示</span></div>
+                  <div class="chart-canvas-wrap compact-chart-wrap"><canvas id="vectorTrendChart"></canvas></div>
+                </div>
+              </div>
+            </div>
+            <details class="details-panel">
+              <summary>展开分类统计明细</summary>
+              <div id="categoryStats" class="empty-state details-body">选择分类字段后显示统计结果。</div>
+            </details>
+          </div>
+
+
+          <div class="tab-content" id="tab-food">
+            <div id="foodStatsPanel" class="food-stats-grid">
+              <div class="empty-state">演示数据加载后显示当前指标统计。</div>
+            </div>
+            <div class="chart-switcher" data-chart-group="food">
+              <button class="chart-switch active" data-chart-panel="chart-food-trend">三期趋势</button>
+              <button class="chart-switch" data-chart-panel="chart-food-group">业态对比</button>
+              <button class="chart-switch" data-chart-panel="chart-food-district">行政区排行</button>
+            </div>
+            <div class="chart-stack chart-stack-food">
+              <div class="chart-panel active" id="chart-food-trend">
+                <div class="chart-card compact-chart-card">
+                  <div class="chart-head"><h3>2019—2023—2025 指标均值趋势</h3><span>按当前方式、类型、指标统计</span></div>
+                  <div class="chart-canvas-wrap compact-chart-wrap"><canvas id="foodTrendChart"></canvas></div>
+                </div>
+              </div>
+              <div class="chart-panel" id="chart-food-group">
+                <div class="chart-card compact-chart-card">
+                  <div class="chart-head"><h3>线上/线下 · 正餐/快餐均值对比</h3><span>按当前年份与指标统计</span></div>
+                  <div class="chart-canvas-wrap compact-chart-wrap"><canvas id="foodGroupChart"></canvas></div>
+                </div>
+              </div>
+              <div class="chart-panel" id="chart-food-district">
+                <div class="chart-card compact-chart-card">
+                  <div class="chart-head"><h3>行政区高值排行</h3><span>当前指标均值 Top 10</span></div>
+                  <div class="chart-canvas-wrap compact-chart-wrap"><canvas id="foodDistrictChart"></canvas></div>
+                </div>
+              </div>
+            </div>
+            <details class="details-panel" open>
+              <summary>展开指标矩阵说明</summary>
+              <div id="foodMatrixDetail" class="details-body food-matrix-detail">
+                <div>字段命名规则：年份 + 服务方式 + 餐饮类型 + 指标，例如 <code>2025年线上送餐快餐可达性</code>。</div>
+                <div>热力图以当前指标数值归一化后渲染，右侧图表同步给出三期变化、业态组合对比与行政区统计。</div>
+              </div>
+            </details>
+          </div>
+
+          <div class="tab-content" id="tab-raster">
+            <div class="chart-grid two-up">
+              <div class="chart-card">
+                <div class="chart-head"><h3>分类面积柱状图</h3><span>当前栅格波段分级面积统计</span></div>
+                <div class="chart-canvas-wrap"><canvas id="rasterClassChart"></canvas></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-head"><h3>多栅格最小/平均/最大值对比</h3><span>已导入 GeoTIFF 当前波段统计对比</span></div>
+                <div class="chart-canvas-wrap"><canvas id="rasterMultiChart"></canvas></div>
+              </div>
+            </div>
+            <div class="raster-flex-grid">
+              <div class="raster-info-block">
+                <h3>点击取值</h3>
+                <div id="rasterClickInfo" class="empty-state compact-empty">点击地图获取当前波段像元值。</div>
+              </div>
+              <div class="raster-info-block">
+                <h3>栅格信息</h3>
+                <div id="rasterInfo" class="empty-state compact-empty">加载 GeoTIFF 后显示范围、分辨率、波段等信息。</div>
+              </div>
+            </div>
+            <div class="raster-info-block full-width-block">
+              <h3>分类面积统计</h3>
+              <div id="rasterClassStats" class="empty-state compact-empty">加载栅格后自动计算分类面积统计。</div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-compare">
+            <div class="chart-switcher" data-chart-group="compare">
+              <button class="chart-switch active" data-chart-panel="chart-compare-metric">最小/平均/最大值</button>
+              <button class="chart-switch" data-chart-panel="chart-compare-diff">差值分布</button>
+              <button class="chart-switch" data-chart-panel="chart-compare-trend">差值趋势</button>
+            </div>
+            <div class="chart-stack chart-stack-sm">
+              <div class="chart-panel active" id="chart-compare-metric">
+                <div class="chart-card compact-chart-card">
+                  <div class="chart-head"><h3>对比指标图</h3><span>比较基准与对比栅格的最小值、均值、最大值</span></div>
+                  <div class="chart-canvas-wrap compact-chart-wrap"><canvas id="compareMetricChart"></canvas></div>
+                </div>
+              </div>
+              <div class="chart-panel" id="chart-compare-diff">
+                <div class="chart-card compact-chart-card">
+                  <div class="chart-head"><h3>差值分布图</h3><span>对比值减基准值的分布</span></div>
+                  <div class="chart-canvas-wrap compact-chart-wrap"><canvas id="compareDiffChart"></canvas></div>
+                </div>
+              </div>
+              <div class="chart-panel" id="chart-compare-trend">
+                <div class="chart-card compact-chart-card">
+                  <div class="chart-head"><h3>差值趋势折线图</h3><span>按采样段聚合后的变化趋势</span></div>
+                  <div class="chart-canvas-wrap compact-chart-wrap"><canvas id="compareTrendChart"></canvas></div>
+                </div>
+              </div>
+            </div>
+            <div id="compareResult" class="empty-state">导入至少两个栅格后，可在左侧“栅格对比”里执行对比。</div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.19.10/dist/proj4.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/shpjs@6.2.0/dist/shp.min.js"></script>
+  <script src="https://unpkg.com/geotiff/dist-browser/geotiff.js"></script>
+  <script src="https://unpkg.com/georaster/dist/georaster.browser.bundle.min.js"></script>
+  <script src="https://unpkg.com/georaster-layer-for-leaflet/georaster-layer-for-leaflet.browserify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

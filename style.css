@@ -1398,12 +1398,13 @@ html, body {
   align-items: center;
   justify-content: center;
   max-width: min(360px, 38vw);
-  padding: 7px 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  box-shadow: 0 10px 26px rgba(4, 31, 99, 0.16);
-  backdrop-filter: blur(7px);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
 }
 .map-logo-overlay img {
   display: block;

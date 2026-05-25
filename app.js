@@ -34,6 +34,9 @@ const DOM = {
   foodStatsPanel: document.getElementById('foodStatsPanel'),
   foodMatrixDetail: document.getElementById('foodMatrixDetail'),
   foodHeatLegend: document.getElementById('foodHeatLegend'),
+  selectedCommunityPanel: document.getElementById('selectedCommunityPanel'),
+  filterMin: document.getElementById('filterMin'),
+  filterMax: document.getElementById('filterMax'),
   mapLayerHint: document.getElementById('mapLayerHint'),
   mapVectorHint: document.getElementById('mapVectorHint'),
   mapRasterHint: document.getElementById('mapRasterHint'),
@@ -287,6 +290,12 @@ async function handleCSVUpload(event) {
     if (!rows.length) throw new Error('CSV 内容为空。');
     const geojson = csvToGeoJSON(rows);
     addVectorLayer(geojson, file.name, 'CSV 转点');
+    const layer = getActiveVectorLayer();
+    if (isFoodLayer(layer)) {
+      state.food.layerId = layer.id;
+      state.food.loaded = true;
+      refreshFoodAnalysis({ updateVectorRender: true });
+    }
   } catch (error) {
     alert(`CSV 导入失败：${error.message}`);
   } finally {
@@ -567,17 +576,31 @@ function clearAllData() {
 function applyFilters() {
   const layer = getActiveVectorLayer();
   if (!layer) return;
-  const keyword = DOM.keywordInput.value.trim().toLowerCase();
-  const categoryField = DOM.categoryField.value;
-  const categoryValue = DOM.categoryValue.value.trim().toLowerCase();
+  const keyword = DOM.keywordInput?.value.trim().toLowerCase() || '';
+  const categoryField = DOM.categoryField?.value || '';
+  const categoryValue = DOM.categoryValue?.value.trim().toLowerCase() || '';
+  const numericField = DOM.renderField?.value || '';
+  const minValue = DOM.filterMin?.value === '' ? null : Number(DOM.filterMin?.value);
+  const maxValue = DOM.filterMax?.value === '' ? null : Number(DOM.filterMax?.value);
+  const hasRange = numericField && (Number.isFinite(minValue) || Number.isFinite(maxValue));
   const features = layer.rawGeoJSON.features.filter((feature) => {
     const props = feature.properties || {};
-    const keywordMatch = !keyword || Object.values(props).some((value) => String(value).toLowerCase().includes(keyword));
+    const keywordFields = ['小区', '地址', '行政区', '城市', '省'];
+    const keywordPool = keywordFields.map((key) => props[key]).filter((value) => value != null && value !== '');
+    const keywordMatch = !keyword || keywordPool.some((value) => String(value).toLowerCase().includes(keyword))
+      || Object.values(props).some((value) => String(value).toLowerCase().includes(keyword));
     const categoryMatch = !categoryField || !categoryValue || String(props[categoryField] ?? '').toLowerCase().includes(categoryValue);
-    return keywordMatch && categoryMatch;
+    let rangeMatch = true;
+    if (hasRange) {
+      const numericValue = Number(props[numericField]);
+      rangeMatch = Number.isFinite(numericValue)
+        && (!Number.isFinite(minValue) || numericValue >= minValue)
+        && (!Number.isFinite(maxValue) || numericValue <= maxValue);
+    }
+    return keywordMatch && categoryMatch && rangeMatch;
   });
   layer.currentGeoJSON = { type: 'FeatureCollection', features };
-  layer.searchActive = Boolean(keyword || categoryValue);
+  layer.searchActive = Boolean(keyword || categoryValue || hasRange);
   layer.selectedFeature = null;
   if (layer.selectedLayer) {
     map.removeLayer(layer.selectedLayer);
@@ -585,6 +608,7 @@ function applyFilters() {
   }
   renderSingleVectorLayer(layer);
   updateVectorUI();
+  if (isFoodLayer(layer)) refreshFoodAnalysis({ updateVectorRender: false });
   fitToVisibleData();
 }
 
@@ -593,6 +617,9 @@ function resetFilters() {
   DOM.categoryField.value = '';
   DOM.categoryValue.value = '';
   DOM.renderField.value = '';
+  if (DOM.filterMin) DOM.filterMin.value = '';
+  if (DOM.filterMax) DOM.filterMax.value = '';
+  if (DOM.selectedCommunityPanel) DOM.selectedCommunityPanel.innerHTML = '点击地图上的小区点位后，这里会显示该小区在当前指标与三期时间截面下的数值。';
   const layer = getActiveVectorLayer();
   if (!layer) {
     updateVectorUI();
@@ -605,8 +632,12 @@ function resetFilters() {
     map.removeLayer(layer.selectedLayer);
     layer.selectedLayer = null;
   }
-  renderAllVectorLayers();
-  updateVectorUI();
+  if (isFoodLayer(layer)) {
+    refreshFoodAnalysis({ updateVectorRender: true });
+  } else {
+    renderAllVectorLayers();
+    updateVectorUI();
+  }
   fitToVisibleData();
 }
 
@@ -637,6 +668,7 @@ function renderSingleVectorLayer(layer) {
         layer.selectedFeature = feature;
         renderLayerList();
         if (DOM.showHighlight.checked) highlightFeature(layer, feature);
+        if (isFoodLayer(layer)) renderSelectedCommunityCard(feature);
         updateVectorUI();
       });
     }
@@ -681,6 +713,7 @@ function updateVectorUI() {
     DOM.fieldList.innerHTML = '<div class="empty-state">导入矢量数据后显示字段列表。</div>';
     DOM.categoryStats.innerHTML = '<div class="empty-state">选择分类字段后显示统计结果。</div>';
     DOM.legendContent.textContent = '未选择专题字段';
+    if (DOM.selectedCommunityPanel) DOM.selectedCommunityPanel.innerHTML = '点击地图上的小区点位后，这里会显示该小区在当前指标与三期时间截面下的数值。';
     DOM.categoryField.innerHTML = '<option value="">请选择字段</option>';
     DOM.renderField.innerHTML = '<option value="">请选择数值字段</option>';
     resetVectorStatsUI();
@@ -762,7 +795,7 @@ async function loadDefaultFoodData(showNotice = false) {
     if (showNotice) console.info('食物环境演示数据已重新加载。');
   } catch (error) {
     console.warn('默认食物环境 CSV 加载失败', error);
-    DOM.foodMetricSummary.innerHTML = `<div class="empty-state">默认 CSV 自动加载失败。部署到 Render/GitHub 后通常可直接读取；本地预览请用 VS Code Live Server 或 Python HTTP Server 打开。也可在“导入与图层”里手动上传 CSV。错误：${escapeHTML(error.message || String(error))}</div>`;
+    DOM.foodMetricSummary.innerHTML = `<div class="empty-state">默认 CSV 自动加载失败。部署到 Render/GitHub 后通常可直接读取；本地预览请用 VS Code Live Server 或 Python HTTP Server 打开。也可在左侧“数据加载与小区检索”中手动上传 CSV。错误：${escapeHTML(error.message || String(error))}</div>`;
     if (DOM.foodHeatLegend) DOM.foodHeatLegend.textContent = '等待加载 CSV';
   }
 }
@@ -771,7 +804,7 @@ function refreshFoodAnalysis(options = {}) {
   const { updateVectorRender = false } = options;
   const layer = getFoodLayer();
   if (!layer) {
-    if (DOM.foodMetricSummary) DOM.foodMetricSummary.innerHTML = '<div class="empty-state">尚未加载食物环境 CSV。请点击“重新加载演示数据”，或在“导入与图层”中上传带 lng/lat 的 CSV。</div>';
+    if (DOM.foodMetricSummary) DOM.foodMetricSummary.innerHTML = '<div class="empty-state">尚未加载食物环境 CSV。请点击“重新加载演示数据”，或在左侧上传带 lng/lat 的 CSV。</div>';
     if (DOM.foodStatsPanel) DOM.foodStatsPanel.innerHTML = '<div class="empty-state">等待食物环境点位数据。</div>';
     removeFoodHeatLayer();
     clearChartGroup(['foodTrendChart', 'foodGroupChart', 'foodDistrictChart']);
@@ -809,7 +842,9 @@ function renderFoodDashboard(layer) {
 }
 
 function getFoodFeatures(layer) {
-  return layer?.currentGeoJSON?.features?.length ? layer.currentGeoJSON.features : layer?.rawGeoJSON?.features || [];
+  if (!layer) return [];
+  if (layer.searchActive) return layer.currentGeoJSON?.features || [];
+  return layer.currentGeoJSON?.features?.length ? layer.currentGeoJSON.features : layer.rawGeoJSON?.features || [];
 }
 
 function getFeatureLngLat(feature) {
@@ -936,7 +971,7 @@ function renderFoodStats(layer, field) {
     DOM.foodMetricSummary.innerHTML = `
       <div class="food-summary-line"><strong>${escapeHTML(label)}</strong><span>${summary.count} 个小区参与统计</span></div>
       <div class="food-summary-line muted">均值 ${formatMaybeNumber(summary.mean)} ｜ 中位数 ${formatMaybeNumber(summary.median)} ｜ P90 ${formatMaybeNumber(summary.p90)}</div>
-      <div class="food-summary-line muted">热力图开启时默认隐藏小区点位；检索结果会以橙色点位突出显示。</div>
+      <div class="food-summary-line muted">点击小区点位可查看该小区三期数值；检索结果会以橙色点位突出显示。</div>
     `;
   }
   if (DOM.foodStatsPanel) {
@@ -1615,9 +1650,67 @@ function getFeatureColor(feature, field, min, max) {
 }
 
 function buildPopupHTML(properties) {
+  const activeFoodField = getFoodField();
+  const isFoodFeature = properties && Object.prototype.hasOwnProperty.call(properties, activeFoodField);
+  if (isFoodFeature) {
+    const name = properties['小区'] || '未命名小区';
+    const district = properties['行政区'] || '-';
+    const address = properties['地址'] || '-';
+    const currentValue = properties[activeFoodField];
+    const mode = DOM.foodModeSelect?.value || '线上送餐';
+    const meal = DOM.foodMealSelect?.value || '快餐';
+    const metric = DOM.foodMetricSelect?.value || '可达性';
+    const yearRows = ['2019', '2023', '2025'].map((year) => {
+      const key = `${year}年${mode}${meal}${metric}`;
+      return `<div class="popup-row"><strong>${year}年</strong><span>${formatMaybeNumber(Number(properties[key]))}</span></div>`;
+    }).join('');
+    return `<div class="popup-card">
+      <div class="popup-title">${escapeHTML(name)}</div>
+      <div class="popup-subtitle">${escapeHTML(district)} ｜ ${escapeHTML(address)}</div>
+      <div class="popup-section-title">当前指标：${escapeHTML(getFoodLabel())}</div>
+      <div class="popup-row highlight"><strong>当前值</strong><span>${formatMaybeNumber(Number(currentValue))}</span></div>
+      <div class="popup-section-title">三期数值</div>
+      ${yearRows}
+      <div class="popup-section-title">基础属性</div>
+      <div class="popup-row"><strong>均价</strong><span>${escapeHTML(properties['均价'] ?? '-')}</span></div>
+      <div class="popup-row"><strong>物业费</strong><span>${escapeHTML(properties['物业费'] ?? '-')}</span></div>
+      <div class="popup-row"><strong>建成时长</strong><span>${escapeHTML(properties['建成时长'] ?? '-')}</span></div>
+      <div class="popup-row"><strong>距市中心</strong><span>${formatMaybeNumber(Number(properties['与市中心的距离']))}</span></div>
+    </div>`;
+  }
   const entries = Object.entries(properties).slice(0, 15);
   if (!entries.length) return '无属性信息';
   return `<div class="popup-grid">${entries.map(([key, value]) => `<div class="popup-row"><strong>${escapeHTML(key)}</strong>: ${escapeHTML(String(value))}</div>`).join('')}</div>`;
+}
+
+function renderSelectedCommunityCard(feature) {
+  if (!DOM.selectedCommunityPanel) return;
+  if (!feature?.properties) {
+    DOM.selectedCommunityPanel.innerHTML = '点击地图上的小区点位后，这里会显示该小区在当前指标与三期时间截面下的数值。';
+    return;
+  }
+  const props = feature.properties;
+  const mode = DOM.foodModeSelect?.value || '线上送餐';
+  const meal = DOM.foodMealSelect?.value || '快餐';
+  const metric = DOM.foodMetricSelect?.value || '可达性';
+  const currentField = getFoodField();
+  const years = ['2019', '2023', '2025'];
+  const rows = years.map((year) => {
+    const key = `${year}年${mode}${meal}${metric}`;
+    return `<div class="community-value-row ${key === currentField ? 'active' : ''}"><span>${year}年</span><strong>${formatMaybeNumber(Number(props[key]))}</strong></div>`;
+  }).join('');
+  DOM.selectedCommunityPanel.classList.remove('empty-state');
+  DOM.selectedCommunityPanel.innerHTML = `
+    <div class="selected-community-title">${escapeHTML(props['小区'] || '未命名小区')}</div>
+    <div class="selected-community-meta">${escapeHTML(props['行政区'] || '-')} ｜ ${escapeHTML(props['地址'] || '-')}</div>
+    <div class="selected-community-current">${escapeHTML(getFoodLabel())}：<strong>${formatMaybeNumber(Number(props[currentField]))}</strong></div>
+    <div class="selected-community-values">${rows}</div>
+    <div class="selected-community-grid">
+      <div><span>均价</span><strong>${escapeHTML(props['均价'] ?? '-')}</strong></div>
+      <div><span>物业费</span><strong>${escapeHTML(props['物业费'] ?? '-')}</strong></div>
+      <div><span>建成时长</span><strong>${escapeHTML(props['建成时长'] ?? '-')}</strong></div>
+      <div><span>距市中心</span><strong>${formatMaybeNumber(Number(props['与市中心的距离']))}</strong></div>
+    </div>`;
 }
 
 function highlightFeature(layer, feature) {

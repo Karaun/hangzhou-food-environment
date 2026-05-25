@@ -1339,3 +1339,207 @@ html, body {
     margin: 10px !important;
   }
 }
+
+
+/* ===== V3 精简演示版：聚焦食物环境、CSV加载、点选数值、Logo透明底 ===== */
+.sidebar-tab[data-side-tab="import"],
+.sidebar-tab[data-side-tab="vector"],
+.sidebar-tab[data-side-tab="raster"],
+.sidebar-tab[data-side-tab="compare"] {
+  display: none !important;
+}
+.sidebar-tabs.sidebar-tabs-single {
+  grid-template-columns: 1fr !important;
+}
+.sidebar-tabs.sidebar-tabs-single .sidebar-tab {
+  display: block !important;
+  text-align: left;
+}
+.sidebar-pane#side-import,
+.sidebar-pane#side-vector,
+.sidebar-pane#side-raster,
+.sidebar-pane#side-compare {
+  display: none !important;
+}
+#side-food.sidebar-pane.active {
+  display: flex !important;
+}
+.csv-upload-box {
+  margin-bottom: 10px;
+  min-height: auto !important;
+}
+.current-layer-card {
+  border: 1px solid rgba(180, 205, 238, 0.72);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(248, 251, 255, 0.88);
+  margin: 10px 0;
+}
+.current-layer-card h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #0d2b55;
+}
+.current-layer-card .layer-list-panel {
+  max-height: 150px !important;
+}
+.food-search-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.food-search-grid label {
+  min-height: 18px;
+}
+.map-logo-overlay {
+  position: absolute;
+  right: 14px;
+  bottom: 16px;
+  z-index: 540;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(360px, 38vw);
+  padding: 7px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 26px rgba(4, 31, 99, 0.16);
+  backdrop-filter: blur(7px);
+}
+.map-logo-overlay img {
+  display: block;
+  width: min(330px, 34vw);
+  height: auto;
+  object-fit: contain;
+}
+.popup-card {
+  min-width: 260px;
+  display: grid;
+  gap: 6px;
+  color: #14243a;
+}
+.popup-title {
+  font-weight: 900;
+  font-size: 15px;
+  color: #083c94;
+}
+.popup-subtitle {
+  font-size: 12px;
+  color: #5f7189;
+  line-height: 1.4;
+}
+.popup-section-title {
+  margin-top: 4px;
+  font-weight: 800;
+  font-size: 12px;
+  color: #0d2b55;
+}
+.popup-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(216, 225, 238, 0.75);
+  padding-bottom: 4px;
+}
+.popup-row.highlight {
+  padding: 6px 8px;
+  border-radius: 10px;
+  border-bottom: 0;
+  background: #eff6ff;
+  color: #0756cf;
+}
+.selected-community-panel {
+  background: linear-gradient(180deg, #ffffff 0%, #f6fbff 100%);
+  border: 1px solid rgba(180, 205, 238, 0.72);
+  border-radius: 16px;
+  padding: 12px;
+}
+.selected-community-title {
+  color: #0756cf;
+  font-size: 16px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+.selected-community-meta {
+  color: #63758c;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+.selected-community-current {
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #0d3d82;
+  padding: 8px 10px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.selected-community-current strong {
+  color: #0756cf;
+}
+.selected-community-values {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.community-value-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid rgba(180, 205, 238, 0.72);
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px 10px;
+  color: #53677f;
+}
+.community-value-row.active {
+  border-color: #49c7ff;
+  background: #f0fbff;
+  color: #083c94;
+}
+.selected-community-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.selected-community-grid > div {
+  border: 1px solid rgba(180, 205, 238, 0.72);
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px;
+}
+.selected-community-grid span {
+  display: block;
+  color: #6b7e95;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.selected-community-grid strong {
+  display: block;
+  color: #0d2b55;
+  font-size: 13px;
+  word-break: break-word;
+}
+.layer-actions {
+  grid-template-columns: 1fr 1fr 58px !important;
+}
+.layer-actions .mini-btn[data-action="activate"] {
+  display: none;
+}
+.layer-actions {
+  grid-template-columns: 1fr 58px !important;
+}
+@media (max-width: 1240px) {
+  .food-search-grid { grid-template-columns: 1fr; }
+  .map-logo-overlay { max-width: min(320px, 52vw); }
+  .map-logo-overlay img { width: min(300px, 48vw); }
+}
+@media (max-width: 820px) {
+  .map-logo-overlay {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
+  }
+  .map-logo-overlay img { width: min(310px, 88vw); }
+}

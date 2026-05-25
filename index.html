@@ -23,12 +23,8 @@
         </div>
       </div>
 
-      <div class="sidebar-tabs">
-        <button class="sidebar-tab" data-side-tab="import" data-short="导">导入与图层</button>
-        <button class="sidebar-tab" data-side-tab="vector" data-short="矢">矢量分析</button>
+      <div class="sidebar-tabs sidebar-tabs-single">
         <button class="sidebar-tab active" data-side-tab="food" data-short="食">食物环境</button>
-        <button class="sidebar-tab" data-side-tab="raster" data-short="栅">栅格分析</button>
-        <button class="sidebar-tab" data-side-tab="compare" data-short="比">栅格对比</button>
       </div>
 
       <div class="sidebar-pane" id="side-import">
@@ -45,7 +41,7 @@
             </label>
             <label class="upload-box">
               <span>CSV（经纬度转点）</span>
-              <input id="csvFile" type="file" accept=".csv" />
+              <input id="legacyCsvFile" type="file" accept=".csv" />
             </label>
             <label class="upload-box raster-box">
               <span>GeoTIFF / TIF</span>
@@ -68,7 +64,7 @@
               <button id="clearAllBtn" class="mini-action danger">清空全部</button>
             </div>
           </div>
-          <div id="layerList" class="layer-list-panel empty-state">还没有导入图层。</div>
+          <div id="legacyLayerList" class="layer-list-panel empty-state">还没有导入图层。</div>
         </section>
 
         <section class="panel panel-tight">
@@ -90,7 +86,7 @@
       <div class="sidebar-pane active" id="side-food">
         <section class="panel panel-tight">
           <h2>可视化内容选择</h2>
-          <div class="sub-title">选择时间、服务方式、餐饮类型和评价指标，地图自动切换社区点位分级与热力图。</div>
+          <div class="sub-title">选择时间截面、服务方式、餐饮类型与评价指标，地图自动切换热力图和小区点位分级。</div>
           <div class="field-grid food-control-grid">
             <div>
               <label>时间截面</label>
@@ -142,13 +138,58 @@
         </section>
 
         <section class="panel panel-tight">
-          <h2>演示内容</h2>
-          <div class="food-matrix-help">
-            <div><strong>时间：</strong>2019、2023、2025</div>
-            <div><strong>方式：</strong>线上、线下</div>
-            <div><strong>类型：</strong>正餐、快餐</div>
-            <div><strong>指标：</strong>可达性、可得性、平均价格、可选择性</div>
+          <h2>数据加载与小区检索</h2>
+          <label class="upload-box csv-upload-box">
+            <span>上传 / 替换 CSV 数据</span>
+            <input id="csvFile" type="file" accept=".csv" />
+          </label>
+          <div class="tips compact-tips">保留 CSV 加载功能。CSV 需包含 <code>lng</code>、<code>lat</code> 字段，以及 2019、2023、2025 年食物环境指标字段。</div>
+
+          <div class="current-layer-card">
+            <h3>当前数据</h3>
+            <div id="layerList" class="layer-list-panel empty-state">还没有导入图层。</div>
           </div>
+
+          <div class="field-grid food-search-grid">
+            <div>
+              <label>小区 / 地址 / 行政区关键词</label>
+              <input id="keywordInput" class="input" type="text" placeholder="例如：三里亭、上城、机场路" />
+            </div>
+            <div>
+              <label>行政区或属性筛选字段</label>
+              <select id="categoryField" class="input">
+                <option value="">不限定字段</option>
+              </select>
+            </div>
+            <div>
+              <label>字段内容筛选</label>
+              <input id="categoryValue" class="input" type="text" placeholder="例如：上城 / 西湖 / 拱墅" />
+            </div>
+            <div>
+              <label>数值范围字段</label>
+              <select id="renderField" class="input">
+                <option value="">请选择数值字段</option>
+              </select>
+            </div>
+            <div>
+              <label>最小值</label>
+              <input id="filterMin" class="input" type="number" step="any" placeholder="可留空" />
+            </div>
+            <div>
+              <label>最大值</label>
+              <input id="filterMax" class="input" type="number" step="any" placeholder="可留空" />
+            </div>
+          </div>
+          <div class="action-row wrap compact-action-row">
+            <button id="applyFilterBtn" class="btn btn-primary">检索并高亮</button>
+            <button id="resetFilterBtn" class="btn btn-light">恢复全部小区</button>
+          </div>
+          <div class="tips compact-tips">检索结果会以橙色点位显示；开启热力图时，检索到的小区仍会自动显示在热力图上方。</div>
+        </section>
+
+        <section class="panel panel-tight">
+          <h2>选中小区数值</h2>
+          <div id="selectedCommunityPanel" class="selected-community-panel empty-state">点击地图上的小区点位后，这里会显示该小区在当前指标与三期时间截面下的数值。</div>
         </section>
       </div>
 
@@ -159,28 +200,28 @@
           <div class="field-grid">
             <div>
               <label>关键字搜索</label>
-              <input id="keywordInput" class="input" type="text" placeholder="搜索任意属性值" />
+              <input id="legacyKeywordInput" class="input" type="text" placeholder="搜索任意属性值" />
             </div>
             <div>
               <label>分类字段</label>
-              <select id="categoryField" class="input">
+              <select id="legacyCategoryField" class="input">
                 <option value="">请选择字段</option>
               </select>
             </div>
             <div>
               <label>分类值筛选</label>
-              <input id="categoryValue" class="input" type="text" placeholder="例如：北京 / A类 / 2025" />
+              <input id="legacyCategoryValue" class="input" type="text" placeholder="例如：北京 / A类 / 2025" />
             </div>
             <div>
               <label>专题渲染数值字段</label>
-              <select id="renderField" class="input">
+              <select id="legacyRenderField" class="input">
                 <option value="">请选择数值字段</option>
               </select>
             </div>
           </div>
           <div class="action-row wrap compact-action-row">
-            <button id="applyFilterBtn" class="btn btn-primary">应用筛选</button>
-            <button id="resetFilterBtn" class="btn btn-light">重置</button>
+            <button id="legacyApplyFilterBtn" class="btn btn-primary">应用筛选</button>
+            <button id="legacyResetFilterBtn" class="btn btn-light">重置</button>
           </div>
         </section>
 
@@ -316,6 +357,9 @@
               <div class="legend-title">栅格分级图例</div>
               <div id="rasterLegend" class="legend-content">未加载栅格</div>
             </div>
+          </div>
+          <div class="map-logo-overlay" aria-label="合作单位标识">
+            <img src="LOGO.png" alt="合作单位 Logo" />
           </div>
           <div id="map"></div>
         </div>
